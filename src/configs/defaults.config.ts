@@ -1,7 +1,7 @@
 import { EnvironmentVariables } from './validation/env.validation.schema';
 
 export default (): Partial<EnvironmentVariables> => {
-  const defaults = {
+  return {
     NODE_ENV: process.env.NODE_ENV || 'testing',
 
     PORT: process.env.PORT ? parseInt(process.env.PORT) : 3004,
@@ -31,6 +31,4 @@ export default (): Partial<EnvironmentVariables> => {
       ? parseInt(process.env.THROTTLE_TTL)
       : 10000,
   };
-
-  return defaults;
 };

@@ -15,10 +15,12 @@ export class RefreshTokenService {
   /**
    * Генерирует refresh token для пользователя
    * @param userId - ID пользователя
+   * @param deviceId - ID устройства
    * @returns refresh token
    */
-  generateRefreshToken(userId: string): string {
-    return this.refreshJwtService.sign({ userId });
+  generateRefreshToken(userId: string, deviceId?: string): string {
+    const payload = deviceId ? { userId, deviceId } : { userId };
+    return this.refreshJwtService.sign(payload);
   }
 
   /**

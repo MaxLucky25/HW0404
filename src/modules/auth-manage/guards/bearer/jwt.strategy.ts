@@ -1,22 +1,23 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Inject } from '@nestjs/common';
 import { UserContextDto } from '../dto/user-context.dto';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { DomainException } from '../../../../core/exceptions/domain-exceptions';
-import { DomainExceptionCode } from '../../../../core/exceptions/domain-exception-codes';
+import { JwtService } from '@nestjs/jwt';
+
+interface JwtServiceWithOptions {
+  options: {
+    secret: string;
+  };
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(configService: ConfigService) {
-    const secret = configService.get<string>('JWT_SECRET');
-    if (!secret) {
-      throw new DomainException({
-        code: DomainExceptionCode.InternalServerError,
-        message: 'JWT_SECRET is not set in environment variables',
-        field: 'Secret',
-      });
-    }
+  constructor(@Inject('ACCESS_JWT_SERVICE') jwtService: JwtService) {
+    // Получаем secret из настроенного JWT сервиса
+    const jwtServiceWithOptions =
+      jwtService as unknown as JwtServiceWithOptions;
+    const secret = jwtServiceWithOptions.options.secret;
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,

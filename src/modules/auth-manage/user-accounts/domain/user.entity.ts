@@ -1,9 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Model } from 'mongoose';
-import { UpdateUserInputDto } from '../api/input-dto/update-user.input.dto';
 import { CreateUserDomainDto } from './dto/create-user.domain.dto';
 import { randomUUID } from 'crypto';
 import { add } from 'date-fns';
+import { UpdateUserInputDto } from '../api/input-dto/update-user.input.dto';
 
 @Schema({ timestamps: true })
 export class User {

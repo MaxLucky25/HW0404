@@ -1,74 +1,100 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
+
+// Controllers
 import { AuthController } from './api/auth.controller';
+import { SecurityController } from '../security-device/api/security.controller';
+
+// Services
 import { AuthService } from './application/auth.service';
-import { AuthQueryRepository } from './infrastructure/query/auth.query-repository';
-import { UsersAccountModule } from '../user-accounts/user-accounts.module';
-import { JwtModule, JwtService } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { RefreshTokenService } from './application/helping-application/refresh-token.service';
+import { JwtConfigService } from './application/helping-application/jwt-config.service';
+
+// Strategies
 import { LocalStrategy } from '../guards/local/local.strategy';
 import { JwtStrategy } from '../guards/bearer/jwt.strategy';
-import { HelpingApplicationModule } from './application/helping-application/helping-application.module';
-import { CqrsModule } from '@nestjs/cqrs';
+import { RefreshTokenStrategy } from '../guards/bearer/refresh-token.strategy';
+
+// Guards
+import { RefreshTokenGuard } from '../guards/bearer/refresh-token.guard';
+import { RefreshTokenAuthGuard } from '../guards/bearer/refresh-token-auth.guard';
+
+// Command Handlers
 import { RegistrationUserUseCase } from './application/usecase/register-user.usecase';
 import { LoginUserUseCase } from './application/usecase/login-user.usecase';
 import { PasswordRecoveryUseCase } from './application/usecase/password-recovery.usecase';
 import { NewPasswordUseCase } from './application/usecase/new-password.usecase';
 import { RegistrationConfirmationUserUseCase } from './application/usecase/registration-confirmation.usecase';
 import { RegistrationEmailResendingUseCase } from './application/usecase/registration-email-resending.usecase';
-import { AuthMeQueryUseCase } from './application/query-usecase/auth-me.usecase';
-import { RefreshTokenService } from './application/helping-application/refresh-token.service';
+import { RefreshTokenUseCase } from './application/usecase/refresh-token.usecase';
+import { LogoutUserUseCase } from './application/usecase/logout-user.usecase';
 
-const CommandHandler = [
+// Query Handlers
+import { AuthMeQueryUseCase } from './application/query-usecase/auth-me.usecase';
+
+// Modules
+import { UsersAccountModule } from '../user-accounts/user-accounts.module';
+import { SecurityDeviceModule } from '../security-device/security-device.module';
+import { HelpingApplicationModule } from './application/helping-application/helping-application.module';
+
+// Command Handlers
+const CommandHandlers = [
   RegistrationUserUseCase,
   LoginUserUseCase,
   PasswordRecoveryUseCase,
   NewPasswordUseCase,
   RegistrationConfirmationUserUseCase,
   RegistrationEmailResendingUseCase,
+  RefreshTokenUseCase,
+  LogoutUserUseCase,
 ];
 
-const QueryHandler = [AuthMeQueryUseCase];
+// Query Handlers
+const QueryHandlers = [AuthMeQueryUseCase];
+
+// Services
+const Services = [AuthService, RefreshTokenService, JwtConfigService];
+
+// Strategies
+const Strategies = [LocalStrategy, JwtStrategy, RefreshTokenStrategy];
+
+// Guards
+const Guards = [RefreshTokenGuard, RefreshTokenAuthGuard];
+
+// JWT Service Providers
+const JwtServiceProviders = [
+  {
+    provide: 'ACCESS_JWT_SERVICE',
+    useFactory: (jwtConfigService: JwtConfigService) => {
+      return jwtConfigService.createAccessJwtService();
+    },
+    inject: [JwtConfigService],
+  },
+  {
+    provide: 'REFRESH_JWT_SERVICE',
+    useFactory: (jwtConfigService: JwtConfigService) => {
+      return jwtConfigService.createRefreshJwtService();
+    },
+    inject: [JwtConfigService],
+  },
+];
 
 @Module({
   imports: [
     CqrsModule,
     HelpingApplicationModule,
     UsersAccountModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN'),
-        },
-      }),
-    }),
+    SecurityDeviceModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SecurityController],
   providers: [
-    ...CommandHandler,
-    ...QueryHandler,
-    AuthService,
-    AuthQueryRepository,
-    LocalStrategy,
-    JwtStrategy,
-    RefreshTokenService,
-    // Провайдер для refresh JWT сервиса
-    {
-      provide: 'REFRESH_JWT_SERVICE',
-      useFactory: (configService: ConfigService) => {
-        const jwtService = new JwtService({
-          secret: configService.get<string>('JWT_REFRESH_SECRET'),
-          signOptions: {
-            expiresIn: configService.get<string>('JWT_REFRESH_EXPIRES_IN'),
-          },
-        });
-        return jwtService;
-      },
-      inject: [ConfigService],
-    },
+    ...CommandHandlers,
+    ...QueryHandlers,
+    ...Services,
+    ...Strategies,
+    ...Guards,
+    ...JwtServiceProviders,
   ],
-  exports: [AuthService, AuthQueryRepository, RefreshTokenService],
+  exports: [AuthService, RefreshTokenService],
 })
 export class AccessModule {}

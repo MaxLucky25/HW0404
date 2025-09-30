@@ -6,7 +6,9 @@ import {
   HttpStatus,
   Post,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiBody,
   ApiOperation,
@@ -18,7 +20,9 @@ import { MeViewDto } from '../../user-accounts/api/view-dto/users.view-dto';
 import { CreateUserInputDto } from '../../user-accounts/api/input-dto/users.input-dto';
 import { LocalAuthGuard } from '../../guards/local/local-auth.guard';
 import { JwtAuthGuard } from '../../guards/bearer/jwt-auth-guard';
+import { RefreshTokenAuthGuard } from '../../guards/bearer/refresh-token-auth.guard';
 import { UserContextDto } from '../../guards/dto/user-context.dto';
+import { TokenContextDto } from '../../guards/dto/token-context.dto';
 import { PasswordRecoveryInputDto } from './input-dto/password-recovery.input.dto';
 import { NewPasswordInputDto } from './input-dto/new-password.input.dto';
 import { RegistrationConfirmationInputDto } from './input-dto/registration-confirmation.input.dto';
@@ -33,7 +37,13 @@ import { NewPasswordCommand } from '../application/usecase/new-password.usecase'
 import { RegistrationConfirmationCommand } from '../application/usecase/registration-confirmation.usecase';
 import { RegistrationEmailResendingCommand } from '../application/usecase/registration-email-resending.usecase';
 import { AuthMeQuery } from '../application/query-usecase/auth-me.usecase';
+import { RefreshTokenCommand } from '../application/usecase/refresh-token.usecase';
+import { LogoutUserCommand } from '../application/usecase/logout-user.usecase';
 import { ExtractUserForJwtGuard } from '../../guards/decorators/param/extract-user-for-jwt-guard.decorator';
+import { ExtractUserForRefreshTokenGuard } from '../../guards/decorators/param/extract-user-for-refresh-token-guard.decorator';
+import { ExtractIp } from '../../guards/decorators/param/extract-ip.decorator';
+import { ExtractUserAgent } from '../../guards/decorators/param/extract-user-agent.decorator';
+import { DeviceTitleService } from '../application/helping-application/device-title.service';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -41,6 +51,7 @@ export class AuthController {
   constructor(
     private commandBus: CommandBus,
     private queryBus: QueryBus,
+    private deviceTitleService: DeviceTitleService,
   ) {}
 
   @Post('registration')
@@ -73,8 +84,18 @@ export class AuthController {
       },
     },
   })
-  async login(@Body() body: LoginInputDto): Promise<LoginResponseDto> {
-    return this.commandBus.execute(new LoginUserCommand(body));
+  async login(
+    @Body() body: LoginInputDto,
+    @ExtractIp() ip: string,
+    @ExtractUserAgent() userAgent: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponseDto> {
+    // Генерируем title на основе User-Agent
+    const title = this.deviceTitleService.generateDeviceTitle(userAgent);
+
+    return this.commandBus.execute(
+      new LoginUserCommand(body, ip, userAgent, title, res),
+    );
   }
 
   @Post('password-recovery')
@@ -181,5 +202,40 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async me(@ExtractUserForJwtGuard() user: UserContextDto): Promise<MeViewDto> {
     return this.queryBus.execute(new AuthMeQuery(user));
+  }
+
+  @Post('refresh-token')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RefreshTokenAuthGuard)
+  @ApiOperation({
+    summary: 'Refresh access token using refresh token from cookie',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Access token refreshed successfully',
+    type: LoginResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refreshToken(
+    @ExtractUserForRefreshTokenGuard() user: TokenContextDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponseDto> {
+    return this.commandBus.execute(new RefreshTokenCommand(user, res));
+  }
+
+  @Post('logout')
+  @UseGuards(RefreshTokenAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Logout user',
+    description: 'Revoke refresh token from cookie',
+  })
+  @ApiResponse({ status: 204, description: 'User logged out successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async logout(
+    @ExtractUserForRefreshTokenGuard() user: TokenContextDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    return this.commandBus.execute(new LogoutUserCommand(user, res));
   }
 }
