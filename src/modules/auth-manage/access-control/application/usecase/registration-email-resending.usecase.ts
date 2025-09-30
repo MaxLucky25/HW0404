@@ -24,6 +24,7 @@ export class RegistrationEmailResendingUseCase
     const user = await this.usersRepository.findByEmail({
       email: command.dto.email,
     });
+
     if (!user || user.isEmailConfirmed) {
       throw new DomainException({
         code: DomainExceptionCode.AlreadyConfirmed,
@@ -31,15 +32,23 @@ export class RegistrationEmailResendingUseCase
         field: 'email',
       });
     }
+
     const expiration = this.authService.getExpiration(
       'EMAIL_CONFIRMATION_EXPIRATION',
     );
     user.resetEmailConfirmation(expiration);
     await this.usersRepository.save(user);
-    await this.emailService.sendConfirmationEmail(
-      user.email,
-      user.emailConfirmation!.confirmationCode,
-    );
+
+    // Отправляем email с обработкой ошибок
+    await this.emailService
+      .sendConfirmationEmail(
+        user.email,
+        user.emailConfirmation!.confirmationCode,
+      )
+      .catch(() => {
+        // Не выбрасываем исключение, просто игнорируем ошибку
+      });
+
     return;
   }
 }

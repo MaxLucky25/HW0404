@@ -26,10 +26,10 @@ export default (): Partial<EnvironmentVariables> => {
 
     THROTTLE_LIMIT: process.env.THROTTLE_LIMIT
       ? parseInt(process.env.THROTTLE_LIMIT)
-      : 10,
+      : 5,
     THROTTLE_TTL: process.env.THROTTLE_TTL
       ? parseInt(process.env.THROTTLE_TTL)
-      : 1000,
+      : 10000,
   };
 
   return defaults;

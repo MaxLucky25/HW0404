@@ -28,10 +28,13 @@ export class PasswordRecoveryUseCase
       );
       user.resetPasswordRecovery(expiration);
       await this.usersRepository.save(user);
-      await this.emailService.sendRecoveryEmail(
-        user.email,
-        user.passwordRecovery!.recoveryCode,
-      );
+
+      // Отправляем email с обработкой ошибок
+      await this.emailService
+        .sendRecoveryEmail(user.email, user.passwordRecovery!.recoveryCode)
+        .catch(() => {
+          // Не выбрасываем исключение, просто игнорируем ошибку
+        });
     }
     return;
   }
