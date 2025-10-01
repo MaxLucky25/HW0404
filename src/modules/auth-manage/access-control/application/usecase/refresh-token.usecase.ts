@@ -57,17 +57,6 @@ export class RefreshTokenUseCase
       });
     }
 
-    // Дополнительная проверка: получаем токен из cookie и сравниваем с токеном в сессии
-    // Это обеспечивает, что старый токен станет невалидным после refresh
-    const refreshTokenFromCookie = command.response.req.cookies?.refreshToken;
-    if (!refreshTokenFromCookie || refreshTokenFromCookie !== session.token) {
-      throw new DomainException({
-        code: DomainExceptionCode.Unauthorized,
-        message: 'Invalid or expired refresh token',
-        field: 'refreshToken',
-      });
-    }
-
     // Генерируем новые токены
     const newRefreshToken = this.refreshTokenService.generateRefreshToken(
       user.userId,
@@ -83,7 +72,7 @@ export class RefreshTokenUseCase
       'JWT_REFRESH_EXPIRES_IN',
     );
 
-    // REFRESH TOKEN ROTATION: Обновляем сессию новым токеном и lastActiveDate
+    // Обновляем сессию в БД
     session.updateToken(newRefreshToken);
     session.updateLastActiveDate();
     session.updateExpiresAt(refreshTokenExpiresIn);
