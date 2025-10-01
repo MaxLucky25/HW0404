@@ -21,12 +21,6 @@ export class DeviceViewDto {
   ip: string;
 
   @ApiProperty({
-    description: 'Device user agent',
-    example: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-  })
-  userAgent: string;
-
-  @ApiProperty({
     description: 'Last activity date',
     example: '2023-12-01T10:30:00.000Z',
   })
@@ -37,7 +31,6 @@ export class DeviceViewDto {
       deviceId: session.deviceId,
       title: session.title,
       ip: session.ip,
-      userAgent: session.userAgent,
       lastActiveDate: session.lastActiveDate.toISOString(),
     };
   }
