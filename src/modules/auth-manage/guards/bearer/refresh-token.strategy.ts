@@ -40,7 +40,7 @@ export class RefreshTokenStrategy extends PassportStrategy(
    * @param payload - payload из JWT
    * @returns TokenContextDto
    */
-  validate(payload: { userId: string; deviceId?: string }): TokenContextDto {
+  validate(payload: { userId: string; deviceId: string }): TokenContextDto {
     if (!payload.userId) {
       throw new DomainException({
         code: DomainExceptionCode.Unauthorized,
@@ -49,9 +49,17 @@ export class RefreshTokenStrategy extends PassportStrategy(
       });
     }
 
+    if (!payload.deviceId) {
+      throw new DomainException({
+        code: DomainExceptionCode.Unauthorized,
+        message: 'Device ID is required in refresh token',
+        field: 'refreshToken',
+      });
+    }
+
     return {
       userId: payload.userId,
-      deviceId: payload.deviceId || 'legacy-device', // Fallback для старых токенов
+      deviceId: payload.deviceId,
     };
   }
 }

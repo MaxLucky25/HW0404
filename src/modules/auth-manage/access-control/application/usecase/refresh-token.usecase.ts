@@ -6,7 +6,6 @@ import { LoginResponseDto } from '../../api/view-dto/login.view-dto';
 import { TokenContextDto } from '../../../guards/dto/token-context.dto';
 import { SecurityDeviceRepository } from '../../../security-device/infrastructure/security-device.repository';
 import { FindByUserAndDeviceDto } from '../../../security-device/infrastructure/dto/session-repo.dto';
-import { CreateSessionDomainDto } from '../../../security-device/domain/dto/create-session.domain.dto';
 import { DomainException } from '../../../../../core/exceptions/domain-exceptions';
 import { DomainExceptionCode } from '../../../../../core/exceptions/domain-exception-codes';
 import { AuthService } from '../auth.service';
@@ -58,6 +57,17 @@ export class RefreshTokenUseCase
       });
     }
 
+    // Дополнительная проверка: получаем токен из cookie и сравниваем с токеном в сессии
+    // Это обеспечивает, что старый токен станет невалидным после refresh
+    const refreshTokenFromCookie = command.response.req.cookies?.refreshToken;
+    if (!refreshTokenFromCookie || refreshTokenFromCookie !== session.token) {
+      throw new DomainException({
+        code: DomainExceptionCode.Unauthorized,
+        message: 'Invalid or expired refresh token',
+        field: 'refreshToken',
+      });
+    }
+
     // Генерируем новые токены
     const newRefreshToken = this.refreshTokenService.generateRefreshToken(
       user.userId,
@@ -73,22 +83,11 @@ export class RefreshTokenUseCase
       'JWT_REFRESH_EXPIRES_IN',
     );
 
-    // REFRESH TOKEN ROTATION: Обновляем lastActiveDate и помечаем старую сессию как revoked
+    // REFRESH TOKEN ROTATION: Обновляем сессию новым токеном и lastActiveDate
+    session.updateToken(newRefreshToken);
     session.updateLastActiveDate();
-    session.revoke();
+    session.updateExpiresAt(refreshTokenExpiresIn);
     await this.securityDeviceRepository.save(session);
-
-    // Создаем новую сессию с новым токеном
-    const newSessionDto: CreateSessionDomainDto = {
-      token: newRefreshToken,
-      userId: session.userId,
-      deviceId: session.deviceId,
-      ip: session.ip,
-      userAgent: session.userAgent, // Сохраняем для истории и поиска существующих сессий
-      title: session.title,
-      expiresIn: refreshTokenExpiresIn,
-    };
-    await this.securityDeviceRepository.createSession(newSessionDto);
 
     // Устанавливаем новый refresh token в cookie
     this.refreshTokenService.setRefreshTokenCookie(response, newRefreshToken);

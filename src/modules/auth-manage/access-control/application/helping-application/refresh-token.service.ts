@@ -15,11 +15,11 @@ export class RefreshTokenService {
   /**
    * Генерирует refresh token для пользователя
    * @param userId - ID пользователя
-   * @param deviceId - ID устройства
+   * @param deviceId - ID устройства (обязательный)
    * @returns refresh token
    */
-  generateRefreshToken(userId: string, deviceId?: string): string {
-    const payload = deviceId ? { userId, deviceId } : { userId };
+  generateRefreshToken(userId: string, deviceId: string): string {
+    const payload = { userId, deviceId };
     return this.refreshJwtService.sign(payload);
   }
 
@@ -37,18 +37,6 @@ export class RefreshTokenService {
       sameSite: 'strict',
       maxAge,
     });
-  }
-
-  /**
-   * Генерирует и устанавливает refresh token в cookie
-   * @param res - Express Response объект
-   * @param userId - ID пользователя
-   * @returns refresh token
-   */
-  generateAndSetRefreshToken(res: Response, userId: string): string {
-    const refreshToken = this.generateRefreshToken(userId);
-    this.setRefreshTokenCookie(res, refreshToken);
-    return refreshToken;
   }
 
   /**
