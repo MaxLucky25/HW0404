@@ -16,7 +16,6 @@ export class LoginUserCommand {
     public readonly dto: LoginInputDto,
     public readonly ip: string,
     public readonly userAgent: string,
-    public readonly title: string,
     public readonly response: Response,
   ) {}
 }
@@ -40,14 +39,17 @@ export class LoginUserUseCase
       'JWT_REFRESH_EXPIRES_IN',
     );
 
-    // Ищем существующую активную сессию с таким же User-Agent для этого пользователя
+    // Ищем существующую активную сессию с таким же IP и браузером для этого пользователя
     const existingSessions = await this.securityDeviceRepository.findByUserId({
       userId: userContext.id,
     } as FindByUserIdDto);
-    const existingSession = existingSessions?.find(
-      (session) =>
-        session.userAgent === command.userAgent && session.isActive(),
-    );
+    const existingSession = existingSessions?.find((session) => {
+      return (
+        session.ip === command.ip &&
+        this.authService.isSameBrowser(session.userAgent, command.userAgent) &&
+        session.isActive()
+      );
+    });
 
     let deviceId: string;
     let refreshToken: string;
@@ -80,7 +82,6 @@ export class LoginUserUseCase
         deviceId,
         ip: command.ip,
         userAgent: command.userAgent,
-        title: command.title,
         expiresIn: refreshTokenExpiresIn,
       };
 

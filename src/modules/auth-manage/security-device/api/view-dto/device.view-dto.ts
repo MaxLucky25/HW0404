@@ -9,8 +9,9 @@ export class DeviceViewDto {
   deviceId: string;
 
   @ApiProperty({
-    description: 'Device title/name',
-    example: 'Chrome Windows',
+    description:
+      'Device name: for example Chrome 105 (received by parsing http header "user-agent")',
+    example: 'Chrome 105',
   })
   title: string;
 
@@ -29,9 +30,17 @@ export class DeviceViewDto {
   static mapToView(session: SessionDocument): DeviceViewDto {
     return {
       deviceId: session.deviceId,
-      title: session.title,
+      title: this.parseUserAgent(session.userAgent),
       ip: session.ip,
       lastActiveDate: session.lastActiveDate.toISOString(),
     };
+  }
+
+  private static parseUserAgent(userAgent: string): string {
+    // Один regex для всех браузеров
+    const match = userAgent.match(
+      /(Chrome|Firefox|Safari|Edg|OPR|Opera)\/(\d+)/,
+    );
+    return match ? `${match[1]} ${match[2]}` : 'Unknown Browser';
   }
 }

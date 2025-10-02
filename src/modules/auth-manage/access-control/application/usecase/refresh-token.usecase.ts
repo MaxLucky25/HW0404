@@ -90,7 +90,6 @@ export class RefreshTokenUseCase
       deviceId: session.deviceId, // Сохраняем тот же deviceId
       ip: session.ip,
       userAgent: session.userAgent,
-      title: session.title,
       expiresIn: refreshTokenExpiresIn,
     };
     await this.securityDeviceRepository.createSession(newSessionDto);

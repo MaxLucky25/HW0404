@@ -19,9 +19,6 @@ export class Session {
   @Prop({ type: String, required: true })
   userAgent: string;
 
-  @Prop({ type: String, required: true })
-  title: string;
-
   @Prop({ type: Date, required: true })
   createdAt: Date;
 
@@ -41,7 +38,6 @@ export class Session {
     session.deviceId = dto.deviceId;
     session.ip = dto.ip;
     session.userAgent = dto.userAgent;
-    session.title = dto.title;
     session.createdAt = new Date();
     session.lastActiveDate = new Date();
     session.expiresAt = new Date(Date.now() + dto.expiresIn);

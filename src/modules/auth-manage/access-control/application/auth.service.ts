@@ -59,4 +59,42 @@ export class AuthService {
 
     return { id: user._id.toString() };
   }
+
+  /**
+   * Проверяет, являются ли два User-Agent строками одного браузера
+   * @param ua1 - первый User-Agent
+   * @param ua2 - второй User-Agent
+   * @returns true, если браузеры одинаковые
+   */
+  isSameBrowser(ua1: string, ua2: string): boolean {
+    const browser1 = this.extractBrowserName(ua1);
+    const browser2 = this.extractBrowserName(ua2);
+    return browser1 === browser2;
+  }
+
+  /**
+   * Извлекает название браузера из User-Agent строки
+   * @param userAgent - User-Agent строка
+   * @returns название браузера
+   */
+  private extractBrowserName(userAgent: string): string {
+    // Проверяем Edge первым, так как он содержит Chrome
+    if (userAgent.includes('Edg')) return 'Edge';
+    // Проверяем Opera
+    if (userAgent.includes('OPR') || userAgent.includes('Opera'))
+      return 'Opera';
+    // Проверяем Firefox
+    if (userAgent.includes('Firefox')) return 'Firefox';
+    // Проверяем Chrome (но не Edge и не Opera)
+    if (
+      userAgent.includes('Chrome') &&
+      !userAgent.includes('Edg') &&
+      !userAgent.includes('OPR')
+    )
+      return 'Chrome';
+    // Проверяем Safari (но не Chrome)
+    if (userAgent.includes('Safari') && !userAgent.includes('Chrome'))
+      return 'Safari';
+    return 'Unknown';
+  }
 }

@@ -35,8 +35,13 @@ describe('EmailService', () => {
       const expectedMailOptions = {
         to: email,
         subject: 'Подтверждение регистрации',
-        text: `Подтвердите регистрацию по ссылке: https://some.com?code=${code}`,
-        html: `<a href="https://some.com?code=${code}">Подтвердить регистрацию</a>`,
+        text: `Подтвердите регистрацию по ссылке: https://somesite.com/confirm-email?code=${code}`,
+        html: `
+        <h1>Thank for your registration</h1>
+        <p>To finish registration please follow the link below:
+            <a href='https://somesite.com/confirm-email?code=${code}'>complete registration</a>
+        </p>
+      `,
       };
 
       mockMailerService.sendMail.mockResolvedValue(undefined);
@@ -73,8 +78,13 @@ describe('EmailService', () => {
       const expectedMailOptions = {
         to: email,
         subject: 'Подтверждение регистрации',
-        text: `Подтвердите регистрацию по ссылке: https://some.com?code=${code}`,
-        html: `<a href="https://some.com?code=${code}">Подтвердить регистрацию</a>`,
+        text: `Подтвердите регистрацию по ссылке: https://somesite.com/confirm-email?code=${code}`,
+        html: `
+        <h1>Thank for your registration</h1>
+        <p>To finish registration please follow the link below:
+            <a href='https://somesite.com/confirm-email?code=${code}'>complete registration</a>
+        </p>
+      `,
       };
 
       mockMailerService.sendMail.mockResolvedValue(undefined);
@@ -97,14 +107,13 @@ describe('EmailService', () => {
       const expectedMailOptions = {
         to: email,
         subject: 'Восстановление пароля',
-        text: `Восстановите пароль по ссылке: https://some.com/recover?code=${recoveryCode}`,
+        text: `Восстановите пароль по ссылке: https://somesite.com/recover?code=${recoveryCode}`,
         html: `
-      <div>
-        <p>Восстановите пароль по ссылке:</p>
-        <a href="https://some.com/recover?code=${recoveryCode}">Восстановить пароль</a>
-        <p><strong>Или используйте код:</strong> <code>${recoveryCode}</code></p>
-      </div>
-    `,
+        <h1>Password Recovery</h1>
+        <p>To reset your password please follow the link below:
+            <a href='https://somesite.com/recover?code=${recoveryCode}'>reset password</a>
+        </p>
+      `,
       };
 
       mockMailerService.sendMail.mockResolvedValue(undefined);
@@ -141,14 +150,13 @@ describe('EmailService', () => {
       const expectedMailOptions = {
         to: email,
         subject: 'Восстановление пароля',
-        text: `Восстановите пароль по ссылке: https://some.com/recover?code=${recoveryCode}`,
+        text: `Восстановите пароль по ссылке: https://somesite.com/recover?code=${recoveryCode}`,
         html: `
-      <div>
-        <p>Восстановите пароль по ссылке:</p>
-        <a href="https://some.com/recover?code=${recoveryCode}">Восстановить пароль</a>
-        <p><strong>Или используйте код:</strong> <code>${recoveryCode}</code></p>
-      </div>
-    `,
+        <h1>Password Recovery</h1>
+        <p>To reset your password please follow the link below:
+            <a href='https://somesite.com/recover?code=${recoveryCode}'>reset password</a>
+        </p>
+      `,
       };
 
       mockMailerService.sendMail.mockResolvedValue(undefined);
@@ -183,22 +191,26 @@ describe('EmailService', () => {
       expect(mockMailerService.sendMail).toHaveBeenNthCalledWith(1, {
         to: email,
         subject: 'Подтверждение регистрации',
-        text: `Подтвердите регистрацию по ссылке: https://some.com?code=${confirmationCode}`,
-        html: `<a href="https://some.com?code=${confirmationCode}">Подтвердить регистрацию</a>`,
+        text: `Подтвердите регистрацию по ссылке: https://somesite.com/confirm-email?code=${confirmationCode}`,
+        html: `
+        <h1>Thank for your registration</h1>
+        <p>To finish registration please follow the link below:
+            <a href='https://somesite.com/confirm-email?code=${confirmationCode}'>complete registration</a>
+        </p>
+      `,
       });
 
       // Check second call (recovery)
       expect(mockMailerService.sendMail).toHaveBeenNthCalledWith(2, {
         to: email,
         subject: 'Восстановление пароля',
-        text: `Восстановите пароль по ссылке: https://some.com/recover?code=${recoveryCode}`,
+        text: `Восстановите пароль по ссылке: https://somesite.com/recover?code=${recoveryCode}`,
         html: `
-      <div>
-        <p>Восстановите пароль по ссылке:</p>
-        <a href="https://some.com/recover?code=${recoveryCode}">Восстановить пароль</a>
-        <p><strong>Или используйте код:</strong> <code>${recoveryCode}</code></p>
-      </div>
-    `,
+        <h1>Password Recovery</h1>
+        <p>To reset your password please follow the link below:
+            <a href='https://somesite.com/recover?code=${recoveryCode}'>reset password</a>
+        </p>
+      `,
       });
     });
   });

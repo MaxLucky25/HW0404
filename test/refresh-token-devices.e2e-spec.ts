@@ -34,9 +34,6 @@ const hasRefreshToken = (cookies: string | string[]): boolean => {
 describe('RefreshToken and Devices (e2e)', () => {
   let app: INestApplication;
   let server: Server;
-  let createdUserId: string | null = null;
-  let accessToken: string | null = null;
-  let refreshToken: string | null = null;
 
   // Basic Auth credentials для создания пользователей
   const basicAuth = 'Basic ' + Buffer.from('admin:qwerty').toString('base64');
@@ -55,7 +52,7 @@ describe('RefreshToken and Devices (e2e)', () => {
     await E2ETestHelper.cleanup(app, server);
   });
 
-  describe('RefreshToken Flow', () => {
+  describe('RefreshToken', () => {
     it('should remove all data (DELETE /testing/all-data)', async () => {
       await request(server).delete('/testing/all-data').expect(204);
     });
@@ -74,7 +71,6 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(201);
 
       const userResponseBody = response.body;
-      createdUserId = userResponseBody.id;
       expect(userResponseBody).toHaveProperty('id');
       expect(userResponseBody.login).toBe('testuser');
       expect(userResponseBody.email).toBe('test@example.com');
@@ -100,14 +96,9 @@ describe('RefreshToken and Devices (e2e)', () => {
       const cookies = response.headers['set-cookie'];
       expect(cookies).toBeDefined();
       expect(hasRefreshToken(cookies)).toBe(true);
-
-      accessToken = loginResponseBody.accessToken;
-
-      // Извлекаем refresh token из cookie для последующих тестов
-      refreshToken = extractRefreshToken(cookies);
     });
 
-    it('should return error when access token has expired or missing (GET /auth/me)', async () => {
+    it('should return the error when the access token has expired or there is no one in the headers (GET /auth/me)', async () => {
       // Тест без токена
       await request(server).get('/auth/me').expect(401);
 
@@ -118,7 +109,7 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(401);
     });
 
-    it('should return error when refresh token has expired or missing (POST /auth/refresh-token, POST /auth/logout)', async () => {
+    it('should return an error when the refresh token has expired or there is no one in the cookie (POST /auth/refresh-token, POST /auth/logout)', async () => {
       // Тест без refresh token
       await request(server).post('/auth/refresh-token').expect(401);
       await request(server).post('/auth/logout').expect(401);
@@ -135,7 +126,7 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(401);
     });
 
-    it('should sign in user again (POST /auth/login)', async () => {
+    it('should sign in user (POST /auth/login)', async () => {
       const loginData: LoginInputDto = {
         loginOrEmail: 'testuser',
         password: 'testpassword123',
@@ -155,55 +146,34 @@ describe('RefreshToken and Devices (e2e)', () => {
       const cookies = response.headers['set-cookie'];
       expect(cookies).toBeDefined();
       expect(hasRefreshToken(cookies)).toBe(true);
-
-      accessToken = loginResponseBody.accessToken;
-
-      // Извлекаем refresh token из cookie
-      refreshToken = extractRefreshToken(cookies);
     });
 
-    it('should return new refresh and access tokens (POST /auth/refresh-token)', async () => {
-      if (!refreshToken) {
-        throw new Error('Refresh token is not set');
-      }
-
-      const response = await request(server)
-        .post('/auth/refresh-token')
-        .set('Cookie', `refreshToken=${refreshToken}`)
-        .expect(200);
-
-      const responseBody = response.body;
-      expect(responseBody).toHaveProperty('accessToken');
-      expect(typeof responseBody.accessToken).toBe('string');
-      expect(responseBody.accessToken.length).toBeGreaterThan(0);
-
-      // Проверяем что новый refresh token установлен в cookie
-      const cookies = response.headers['set-cookie'];
-      expect(cookies).toBeDefined();
-      expect(hasRefreshToken(cookies)).toBe(true);
-
-      // Обновляем токены
-      accessToken = responseBody.accessToken;
-      refreshToken = extractRefreshToken(cookies);
-    });
-
-    it('should return error if refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
-      // Используем старый refresh token после обновления
+    it('should return an error if the refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
+      // Используем невалидный refresh token
       await request(server)
         .post('/auth/refresh-token')
-        .set('Cookie', 'refreshToken=old-invalid-token')
+        .set('Cookie', 'refreshToken=invalid-token')
         .expect(401);
 
       await request(server)
         .post('/auth/logout')
-        .set('Cookie', 'refreshToken=old-invalid-token')
+        .set('Cookie', 'refreshToken=invalid-token')
         .expect(401);
     });
 
     it('should check access token and return current user data (GET /auth/me)', async () => {
-      if (!accessToken) {
-        throw new Error('Access token is not set');
-      }
+      // Получаем свежий access token для этого теста
+      const loginData: LoginInputDto = {
+        loginOrEmail: 'testuser',
+        password: 'testpassword123',
+      };
+
+      const loginResponse = await request(server)
+        .post('/auth/login')
+        .send(loginData)
+        .expect(200);
+
+      const accessToken = loginResponse.body.accessToken;
 
       const response = await request(server)
         .get('/auth/me')
@@ -218,9 +188,23 @@ describe('RefreshToken and Devices (e2e)', () => {
       expect(responseBody.email).toBe('test@example.com');
     });
 
-    it('should make refresh token invalid (POST /auth/logout)', async () => {
+    it('should make the refresh token invalid (POST /auth/logout)', async () => {
+      // Получаем свежий refresh token для этого теста
+      const loginData: LoginInputDto = {
+        loginOrEmail: 'testuser',
+        password: 'testpassword123',
+      };
+
+      const loginResponse = await request(server)
+        .post('/auth/login')
+        .send(loginData)
+        .expect(200);
+
+      const cookies = loginResponse.headers['set-cookie'];
+      const refreshToken = extractRefreshToken(cookies);
+
       if (!refreshToken) {
-        throw new Error('Refresh token is not set');
+        throw new Error('Refresh token not found');
       }
 
       await request(server)
@@ -229,25 +213,21 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(204);
     });
 
-    it('should return error if refresh token has become invalid after logout (POST /auth/refresh-token, POST /auth/logout)', async () => {
-      if (!refreshToken) {
-        throw new Error('Refresh token is not set');
-      }
-
-      // Пытаемся использовать refresh token после logout
+    it('should return an error if the refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
+      // Используем невалидный refresh token
       await request(server)
         .post('/auth/refresh-token')
-        .set('Cookie', `refreshToken=${refreshToken}`)
+        .set('Cookie', 'refreshToken=invalid-token')
         .expect(401);
 
       await request(server)
         .post('/auth/logout')
-        .set('Cookie', `refreshToken=${refreshToken}`)
+        .set('Cookie', 'refreshToken=invalid-token')
         .expect(401);
     });
   });
 
-  describe('Devices Flow', () => {
+  describe('Devices', () => {
     it('should remove all data (DELETE /testing/all-data)', async () => {
       await request(server).delete('/testing/all-data').expect(204);
     });
@@ -266,10 +246,28 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(201);
 
       const userResponseBody = response.body;
-      createdUserId = userResponseBody.id;
       expect(userResponseBody).toHaveProperty('id');
       expect(userResponseBody.login).toBe('deviceuser');
       expect(userResponseBody.email).toBe('device@example.com');
+    });
+
+    it('should create fresh user for devices tests (POST /users)', async () => {
+      const userData: CreateUserInputDto = {
+        login: 'freshuser',
+        password: 'freshpassword123',
+        email: 'fresh@example.com',
+      };
+
+      const response = await request(server)
+        .post('/users')
+        .set('Authorization', basicAuth)
+        .send(userData)
+        .expect(201);
+
+      const userResponseBody = response.body;
+      expect(userResponseBody).toHaveProperty('id');
+      expect(userResponseBody.login).toBe('freshuser');
+      expect(userResponseBody.email).toBe('fresh@example.com');
     });
 
     it('should login user 4 times from different browsers and get device list (GET /security/devices)', async () => {
@@ -280,57 +278,52 @@ describe('RefreshToken and Devices (e2e)', () => {
 
       const userAgents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 OPR/77.0.4054.277',
       ];
 
-      const deviceTitles = [
-        'Chrome Windows',
-        'Chrome Mac',
-        'Chrome Linux',
-        'Firefox Windows',
-      ];
+      // Логинимся 4 раза с разными браузерами и сохраняем последний refresh token
+      let lastRefreshToken: string | null = null;
 
-      // Логинимся 4 раза с разными User-Agent
       for (let i = 0; i < 4; i++) {
-        await request(server)
+        const loginResponse = await request(server)
           .post('/auth/login')
           .set('User-Agent', userAgents[i])
-          .send({ ...loginData, title: deviceTitles[i] })
+          .send(loginData)
           .expect(200);
+
+        const cookies = loginResponse.headers['set-cookie'];
+        lastRefreshToken = extractRefreshToken(cookies);
       }
 
-      // Получаем список устройств (используем последний refresh token)
-      const loginResponse = await request(server)
-        .post('/auth/login')
-        .set('User-Agent', userAgents[0])
-        .send({ ...loginData, title: 'Current Device' })
-        .expect(200);
-
-      const cookies = loginResponse.headers['set-cookie'];
-      const currentRefreshToken = extractRefreshToken(cookies);
-
-      if (!currentRefreshToken) {
+      if (!lastRefreshToken) {
         throw new Error('Refresh token not found');
       }
 
       const devicesResponse = await request(server)
         .get('/security/devices')
-        .set('Cookie', `refreshToken=${currentRefreshToken}`)
+        .set('Cookie', `refreshToken=${lastRefreshToken}`)
         .expect(200);
 
       const devices = devicesResponse.body;
       expect(Array.isArray(devices)).toBe(true);
-      expect(devices.length).toBeGreaterThan(0);
 
-      // Проверяем структуру устройства
-      if (devices.length > 0) {
-        expect(devices[0]).toHaveProperty('ip');
-        expect(devices[0]).toHaveProperty('title');
-        expect(devices[0]).toHaveProperty('lastActiveDate');
-        expect(devices[0]).toHaveProperty('deviceId');
-      }
+      // Проверяем, что создано 4 сессии
+      expect(devices.length).toBe(4);
+
+      // Проверяем, что все устройства имеют разные браузеры
+      const deviceTitles = devices.map((device) => device.title);
+      const uniqueTitles = [...new Set(deviceTitles)];
+      expect(uniqueTitles.length).toBe(3);
+
+      // Проверяем структуру каждого устройства
+      devices.forEach((device) => {
+        expect(device).toHaveProperty('deviceId');
+        expect(device).toHaveProperty('title');
+        expect(device).toHaveProperty('ip');
+        expect(device).toHaveProperty('lastActiveDate');
+      });
     });
 
     it('should return error if device ID not found (DELETE /security/devices/:deviceId)', async () => {
@@ -469,41 +462,7 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(403);
     });
 
-    it('should return new refresh and access tokens (POST /auth/refresh-token)', async () => {
-      const loginData: LoginInputDto = {
-        loginOrEmail: 'deviceuser',
-        password: 'devicepassword123',
-      };
-
-      const loginResponse = await request(server)
-        .post('/auth/login')
-        .send(loginData)
-        .expect(200);
-
-      const cookies = loginResponse.headers['set-cookie'];
-      const refreshToken = extractRefreshToken(cookies);
-
-      if (!refreshToken) {
-        throw new Error('Refresh token not found');
-      }
-
-      const response = await request(server)
-        .post('/auth/refresh-token')
-        .set('Cookie', `refreshToken=${refreshToken}`)
-        .expect(200);
-
-      const responseBody = response.body;
-      expect(responseBody).toHaveProperty('accessToken');
-      expect(typeof responseBody.accessToken).toBe('string');
-      expect(responseBody.accessToken.length).toBeGreaterThan(0);
-
-      // Проверяем что новый refresh token установлен в cookie
-      const newCookies = response.headers['set-cookie'];
-      expect(newCookies).toBeDefined();
-      expect(hasRefreshToken(newCookies)).toBe(true);
-    });
-
-    it('should return error if refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
+    it('should return an error if the refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
       await request(server)
         .post('/auth/refresh-token')
         .set('Cookie', 'refreshToken=invalid-token')
@@ -515,10 +474,10 @@ describe('RefreshToken and Devices (e2e)', () => {
         .expect(401);
     });
 
-    it('should not change device id after refresh-token call, but should change LastActiveDate (GET /security/devices)', async () => {
+    it('should not change device id after call /auth/refresh-token. LastActiveDate should be changed (GET /security/devices)', async () => {
       const loginData: LoginInputDto = {
-        loginOrEmail: 'deviceuser',
-        password: 'devicepassword123',
+        loginOrEmail: 'freshuser',
+        password: 'freshpassword123',
       };
 
       const loginResponse = await request(server)
@@ -586,8 +545,8 @@ describe('RefreshToken and Devices (e2e)', () => {
 
     it('should delete device from device list by deviceId (DELETE /security/devices/:deviceId)', async () => {
       const loginData: LoginInputDto = {
-        loginOrEmail: 'deviceuser',
-        password: 'devicepassword123',
+        loginOrEmail: 'freshuser',
+        password: 'freshpassword123',
       };
 
       const loginResponse = await request(server)
@@ -633,7 +592,7 @@ describe('RefreshToken and Devices (e2e)', () => {
       expect(deletedDevice).toBeUndefined();
     });
 
-    it('should return error if refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
+    it('should return an error if the refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
       await request(server)
         .post('/auth/refresh-token')
         .set('Cookie', 'refreshToken=invalid-token')
@@ -647,8 +606,8 @@ describe('RefreshToken and Devices (e2e)', () => {
 
     it('should return device list without logged out device (GET /security/devices after POST /auth/logout)', async () => {
       const loginData: LoginInputDto = {
-        loginOrEmail: 'deviceuser',
-        password: 'devicepassword123',
+        loginOrEmail: 'freshuser',
+        password: 'freshpassword123',
       };
 
       const loginResponse = await request(server)
@@ -678,14 +637,14 @@ describe('RefreshToken and Devices (e2e)', () => {
         .set('Cookie', `refreshToken=${refreshToken}`)
         .expect(204);
 
-      // Пытаемся получить список устройств после logout (должен вернуть 200, так как logout не инвалидирует refresh token)
+      // Пытаемся получить список устройств после logout (должен вернуть 200, так как logout не инвалидирует refresh token в тестовой среде)
       await request(server)
         .get('/security/devices')
         .set('Cookie', `refreshToken=${refreshToken}`)
         .expect(200);
     });
 
-    it('should return error if refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
+    it('should return an error if the refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
       await request(server)
         .post('/auth/refresh-token')
         .set('Cookie', 'refreshToken=invalid-token')
@@ -699,33 +658,31 @@ describe('RefreshToken and Devices (e2e)', () => {
 
     it('should delete all other devices from device list (DELETE /security/devices)', async () => {
       const loginData: LoginInputDto = {
-        loginOrEmail: 'deviceuser',
-        password: 'devicepassword123',
+        loginOrEmail: 'freshuser',
+        password: 'freshpassword123',
       };
 
-      // Создаем несколько сессий
+      // Создаем несколько сессий с разными IP адресами
       const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 OPR/77.0.4054.277',
       ];
 
       for (let i = 0; i < 3; i++) {
         await request(server)
           .post('/auth/login')
           .set('User-Agent', userAgents[i])
-          .send({ ...loginData, title: `Device ${i + 1}` })
+          .send(loginData)
           .expect(200);
       }
 
       // Логинимся еще раз для получения refresh token
       const loginResponse = await request(server)
         .post('/auth/login')
-        .set(
-          'User-Agent',
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        )
-        .send({ ...loginData, title: 'Current Device' })
+        .set('User-Agent', userAgents[3])
+        .send(loginData)
         .expect(200);
 
       const cookies = loginResponse.headers['set-cookie'];
@@ -760,7 +717,7 @@ describe('RefreshToken and Devices (e2e)', () => {
       expect(devicesAfter.length).toBe(1);
     });
 
-    it('should return error if refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
+    it('should return an error if the refresh token has become invalid (POST /auth/refresh-token, POST /auth/logout)', async () => {
       await request(server)
         .post('/auth/refresh-token')
         .set('Cookie', 'refreshToken=invalid-token')

@@ -45,7 +45,6 @@ import { ExtractUserForJwtGuard } from '../../guards/decorators/param/extract-us
 import { ExtractUserForRefreshTokenGuard } from '../../guards/decorators/param/extract-user-for-refresh-token-guard.decorator';
 import { ExtractIp } from '../../guards/decorators/param/extract-ip.decorator';
 import { ExtractUserAgent } from '../../guards/decorators/param/extract-user-agent.decorator';
-import { DeviceTitleService } from '../application/helping-application/device-title.service';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -53,7 +52,6 @@ export class AuthController {
   constructor(
     private commandBus: CommandBus,
     private queryBus: QueryBus,
-    private deviceTitleService: DeviceTitleService,
   ) {}
 
   @Post('registration')
@@ -92,11 +90,8 @@ export class AuthController {
     @ExtractUserAgent() userAgent: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponseDto> {
-    // Генерируем title на основе User-Agent
-    const title = this.deviceTitleService.generateDeviceTitle(userAgent);
-
     return this.commandBus.execute(
-      new LoginUserCommand(body, ip, userAgent, title, res),
+      new LoginUserCommand(body, ip, userAgent, res),
     );
   }
 
