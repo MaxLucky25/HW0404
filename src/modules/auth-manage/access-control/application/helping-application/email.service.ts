@@ -11,7 +11,9 @@ export class EmailService {
       code,
     });
     try {
-      await this.mailerService.sendMail({
+      console.log('About to call mailerService.sendMail');
+      // Добавляем timeout для email отправки
+      const emailPromise = this.mailerService.sendMail({
         to: email,
         subject: 'Подтверждение регистрации',
         text: `Подтвердите регистрацию по ссылке: https://somesite.com/confirm-email?code=${code}`,
@@ -22,6 +24,12 @@ export class EmailService {
           </p>
         `,
       });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Email sending timeout')), 5000); // 5 секунд timeout
+      });
+
+      await Promise.race([emailPromise, timeoutPromise]);
       console.log('EmailService.sendConfirmationEmail completed successfully');
     } catch (error) {
       console.log('EmailService.sendConfirmationEmail failed:', error.message);

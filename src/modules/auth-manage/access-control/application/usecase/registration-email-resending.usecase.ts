@@ -54,9 +54,9 @@ export class RegistrationEmailResendingUseCase
     await this.usersRepository.save(user);
     console.log('User saved with new confirmation code');
 
-    // Отправляем email с обработкой ошибок
+    // Отправляем email с обработкой ошибок (не ждем завершения)
     console.log('Attempting to send confirmation email');
-    await this.emailService
+    this.emailService
       .sendConfirmationEmail(
         user.email,
         user.emailConfirmation!.confirmationCode,
