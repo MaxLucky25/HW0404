@@ -172,6 +172,7 @@ export class AuthController {
   }
 
   @Post('registration-email-resending')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Resend confirmation registration Email if user exists',
   })
