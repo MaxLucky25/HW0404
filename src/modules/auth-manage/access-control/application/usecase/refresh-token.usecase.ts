@@ -1,20 +1,22 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { JwtService } from '@nestjs/jwt';
 import { Inject } from '@nestjs/common';
-import { Response } from 'express';
 import { LoginResponseDto } from '../../api/view-dto/login.view-dto';
 import { TokenContextDto } from '../../../guards/dto/token-context.dto';
 import { SecurityDeviceRepository } from '../../../security-device/infrastructure/security-device.repository';
 import { FindByUserAndDeviceDto } from '../../../security-device/infrastructure/dto/session-repo.dto';
+import { CreateSessionDomainDto } from '../../../security-device/domain/dto/create-session.domain.dto';
 import { DomainException } from '../../../../../core/exceptions/domain-exceptions';
 import { DomainExceptionCode } from '../../../../../core/exceptions/domain-exception-codes';
 import { AuthService } from '../auth.service';
 import { RefreshTokenService } from '../helping-application/refresh-token.service';
+import { ResponseWithCookies } from '../../../../../types/express-typed';
 
 export class RefreshTokenCommand {
   constructor(
     public readonly user: TokenContextDto,
-    public readonly response: Response,
+    public readonly cookies: Record<string, string> | undefined,
+    public readonly response: ResponseWithCookies,
   ) {}
 }
 
@@ -30,7 +32,7 @@ export class RefreshTokenUseCase
   ) {}
 
   async execute(command: RefreshTokenCommand): Promise<LoginResponseDto> {
-    const { user, response } = command;
+    const { user, cookies, response } = command;
 
     // Ищем сессию в БД по userId + deviceId
     const sessionDto: FindByUserAndDeviceDto = {
@@ -48,14 +50,19 @@ export class RefreshTokenUseCase
       });
     }
 
-    // Проверяем, что сессия активна
-    if (!session.isActive()) {
+    // Валидируем refresh token против сессии в БД
+    const refreshTokenFromCookie = cookies?.refreshToken;
+    if (!refreshTokenFromCookie) {
       throw new DomainException({
         code: DomainExceptionCode.Unauthorized,
-        message: 'Session is expired or revoked',
+        message: 'Refresh token not found in cookies',
         field: 'refreshToken',
       });
     }
+    this.refreshTokenService.validateRefreshToken(
+      session,
+      refreshTokenFromCookie,
+    );
 
     // Генерируем новые токены
     const newRefreshToken = this.refreshTokenService.generateRefreshToken(
@@ -72,11 +79,21 @@ export class RefreshTokenUseCase
       'JWT_REFRESH_EXPIRES_IN',
     );
 
-    // Обновляем сессию в БД
-    session.updateToken(newRefreshToken);
-    session.updateLastActiveDate();
-    session.updateExpiresAt(refreshTokenExpiresIn);
+    // Инвалидируем старую сессию (refresh token rotation)
+    session.revoke();
     await this.securityDeviceRepository.save(session);
+
+    // Создаем новую сессию с новым токеном (тот же deviceId)
+    const newSessionDto: CreateSessionDomainDto = {
+      token: newRefreshToken,
+      userId: user.userId,
+      deviceId: session.deviceId, // Сохраняем тот же deviceId
+      ip: session.ip,
+      userAgent: session.userAgent,
+      title: session.title,
+      expiresIn: refreshTokenExpiresIn,
+    };
+    await this.securityDeviceRepository.createSession(newSessionDto);
 
     // Устанавливаем новый refresh token в cookie
     this.refreshTokenService.setRefreshTokenCookie(response, newRefreshToken);

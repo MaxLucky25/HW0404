@@ -1,15 +1,17 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Response } from 'express';
 import { TokenContextDto } from '../../../guards/dto/token-context.dto';
 import { SecurityDeviceRepository } from '../../../security-device/infrastructure/security-device.repository';
 import { FindByUserAndDeviceDto } from '../../../security-device/infrastructure/dto/session-repo.dto';
 import { DomainException } from '../../../../../core/exceptions/domain-exceptions';
 import { DomainExceptionCode } from '../../../../../core/exceptions/domain-exception-codes';
+import { RefreshTokenService } from '../helping-application/refresh-token.service';
+import { ResponseWithCookies } from '../../../../../types/express-typed';
 
 export class LogoutUserCommand {
   constructor(
     public readonly user: TokenContextDto,
-    public readonly response: Response,
+    public readonly cookies: Record<string, string> | undefined,
+    public readonly response: ResponseWithCookies,
   ) {}
 }
 
@@ -17,10 +19,13 @@ export class LogoutUserCommand {
 export class LogoutUserUseCase
   implements ICommandHandler<LogoutUserCommand, void>
 {
-  constructor(private securityDeviceRepository: SecurityDeviceRepository) {}
+  constructor(
+    private securityDeviceRepository: SecurityDeviceRepository,
+    private refreshTokenService: RefreshTokenService,
+  ) {}
 
   async execute(command: LogoutUserCommand): Promise<void> {
-    const { user, response } = command;
+    const { user, cookies, response } = command;
 
     // Ищем сессию в БД по userId + deviceId
     const sessionDto: FindByUserAndDeviceDto = {
@@ -38,14 +43,19 @@ export class LogoutUserUseCase
       });
     }
 
-    // Проверяем, что сессия активна
-    if (!session.isActive()) {
+    // Валидируем refresh token против сессии в БД
+    const refreshTokenFromCookie = cookies?.refreshToken;
+    if (!refreshTokenFromCookie) {
       throw new DomainException({
         code: DomainExceptionCode.Unauthorized,
-        message: 'Session is expired or revoked',
+        message: 'Refresh token not found in cookies',
         field: 'refreshToken',
       });
     }
+    this.refreshTokenService.validateRefreshToken(
+      session,
+      refreshTokenFromCookie,
+    );
 
     // Отзываем сессию
     session.revoke();

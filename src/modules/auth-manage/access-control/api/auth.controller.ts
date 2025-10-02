@@ -5,10 +5,11 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  UseGuards,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ResponseWithCookies } from '../../../../types/express-typed';
 import {
   ApiBody,
   ApiOperation,
@@ -23,6 +24,7 @@ import { JwtAuthGuard } from '../../guards/bearer/jwt-auth-guard';
 import { RefreshTokenAuthGuard } from '../../guards/bearer/refresh-token-auth.guard';
 import { UserContextDto } from '../../guards/dto/user-context.dto';
 import { TokenContextDto } from '../../guards/dto/token-context.dto';
+import { Cookies } from '../../../../common/decorators/cookies.decorator';
 import { PasswordRecoveryInputDto } from './input-dto/password-recovery.input.dto';
 import { NewPasswordInputDto } from './input-dto/new-password.input.dto';
 import { RegistrationConfirmationInputDto } from './input-dto/registration-confirmation.input.dto';
@@ -218,9 +220,10 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refreshToken(
     @ExtractUserForRefreshTokenGuard() user: TokenContextDto,
-    @Res({ passthrough: true }) res: Response,
+    @Cookies() cookies: Record<string, string> | undefined,
+    @Res({ passthrough: true }) res: ResponseWithCookies,
   ): Promise<LoginResponseDto> {
-    return this.commandBus.execute(new RefreshTokenCommand(user, res));
+    return this.commandBus.execute(new RefreshTokenCommand(user, cookies, res));
   }
 
   @Post('logout')
@@ -234,8 +237,9 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async logout(
     @ExtractUserForRefreshTokenGuard() user: TokenContextDto,
-    @Res({ passthrough: true }) res: Response,
+    @Cookies() cookies: Record<string, string> | undefined,
+    @Res({ passthrough: true }) res: ResponseWithCookies,
   ): Promise<void> {
-    return this.commandBus.execute(new LogoutUserCommand(user, res));
+    return this.commandBus.execute(new LogoutUserCommand(user, cookies, res));
   }
 }

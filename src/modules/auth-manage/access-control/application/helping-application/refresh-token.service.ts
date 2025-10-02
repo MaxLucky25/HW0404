@@ -1,9 +1,13 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { DomainException } from '../../../../../core/exceptions/domain-exceptions';
 import { DomainExceptionCode } from '../../../../../core/exceptions/domain-exception-codes';
+import { SessionDocument } from '../../../security-device/domain/session.entity';
+import {
+  ResponseWithCookies,
+  CookieOptions,
+} from '../../../../../types/express-typed';
 
 @Injectable()
 export class RefreshTokenService {
@@ -15,11 +19,11 @@ export class RefreshTokenService {
   /**
    * Генерирует refresh token для пользователя
    * @param userId - ID пользователя
-   * @param deviceId - ID устройства
+   * @param deviceId - ID устройства (обязательный)
    * @returns refresh token
    */
-  generateRefreshToken(userId: string, deviceId?: string): string {
-    const payload = deviceId ? { userId, deviceId } : { userId };
+  generateRefreshToken(userId: string, deviceId: string): string {
+    const payload = { userId, deviceId };
     return this.refreshJwtService.sign(payload);
   }
 
@@ -28,27 +32,43 @@ export class RefreshTokenService {
    * @param res - Express Response объект
    * @param refreshToken - refresh token для установки
    */
-  setRefreshTokenCookie(res: Response, refreshToken: string): void {
+  setRefreshTokenCookie(res: ResponseWithCookies, refreshToken: string): void {
     const maxAge = this.getRefreshTokenMaxAge();
 
-    res.cookie('refreshToken', refreshToken, {
+    const cookieOptions: CookieOptions = {
       httpOnly: true,
       secure: this.configService.get<string>('NODE_ENV') === 'production',
       sameSite: 'strict',
       maxAge,
-    });
+    };
+
+    res.cookie('refreshToken', refreshToken, cookieOptions);
   }
 
   /**
-   * Генерирует и устанавливает refresh token в cookie
-   * @param res - Express Response объект
-   * @param userId - ID пользователя
-   * @returns refresh token
+   * Валидирует refresh token против сессии в БД
+   * @param session - сессия из БД
+   * @param refreshTokenFromCookie - токен из cookie
    */
-  generateAndSetRefreshToken(res: Response, userId: string): string {
-    const refreshToken = this.generateRefreshToken(userId);
-    this.setRefreshTokenCookie(res, refreshToken);
-    return refreshToken;
+  validateRefreshToken(
+    session: SessionDocument,
+    refreshTokenFromCookie: string,
+  ): void {
+    if (!refreshTokenFromCookie) {
+      throw new DomainException({
+        code: DomainExceptionCode.Unauthorized,
+        message: 'Refresh token is missing',
+        field: 'refreshToken',
+      });
+    }
+
+    if (session.token !== refreshTokenFromCookie) {
+      throw new DomainException({
+        code: DomainExceptionCode.Unauthorized,
+        message: 'Invalid refresh token',
+        field: 'refreshToken',
+      });
+    }
   }
 
   /**

@@ -27,6 +27,7 @@ export class SecurityDeviceRepository {
       userId: dto.userId,
       deviceId: dto.deviceId,
       isRevoked: false,
+      expiresAt: { $gt: new Date() }, // Только не истекшие сессии
     });
   }
 

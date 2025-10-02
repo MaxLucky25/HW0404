@@ -6,6 +6,7 @@ import { Request } from 'express';
 import { TokenContextDto } from '../dto/token-context.dto';
 import { DomainException } from '../../../../core/exceptions/domain-exceptions';
 import { DomainExceptionCode } from '../../../../core/exceptions/domain-exception-codes';
+import { RequestWithCookies } from '../../../../types/express-typed';
 
 interface JwtServiceWithOptions {
   options: {
@@ -27,7 +28,8 @@ export class RefreshTokenStrategy extends PassportStrategy(
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request): string | null => {
-          return (req.cookies?.refreshToken as string | undefined) ?? null;
+          const typedReq = req as RequestWithCookies;
+          return typedReq.cookies?.refreshToken ?? null;
         },
       ]),
       ignoreExpiration: false,
@@ -40,7 +42,15 @@ export class RefreshTokenStrategy extends PassportStrategy(
    * @param payload - payload из JWT
    * @returns TokenContextDto
    */
-  validate(payload: { userId: string; deviceId?: string }): TokenContextDto {
+  validate(payload: { userId: string; deviceId: string }): TokenContextDto {
+    if (!payload || typeof payload !== 'object') {
+      throw new DomainException({
+        code: DomainExceptionCode.Unauthorized,
+        message: 'Invalid refresh token payload',
+        field: 'refreshToken',
+      });
+    }
+
     if (!payload.userId) {
       throw new DomainException({
         code: DomainExceptionCode.Unauthorized,
@@ -49,9 +59,17 @@ export class RefreshTokenStrategy extends PassportStrategy(
       });
     }
 
+    if (!payload.deviceId) {
+      throw new DomainException({
+        code: DomainExceptionCode.Unauthorized,
+        message: 'Device ID is required in refresh token',
+        field: 'refreshToken',
+      });
+    }
+
     return {
       userId: payload.userId,
-      deviceId: payload.deviceId || 'legacy-device', // Fallback для старых токенов
+      deviceId: payload.deviceId,
     };
   }
 }
