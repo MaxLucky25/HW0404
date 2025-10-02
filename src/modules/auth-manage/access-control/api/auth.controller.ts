@@ -24,7 +24,7 @@ import { JwtAuthGuard } from '../../guards/bearer/jwt-auth-guard';
 import { RefreshTokenAuthGuard } from '../../guards/bearer/refresh-token-auth.guard';
 import { UserContextDto } from '../../guards/dto/user-context.dto';
 import { TokenContextDto } from '../../guards/dto/token-context.dto';
-import { Cookies } from '../../../../common/decorators/cookies.decorator';
+import { Cookies } from '../../guards/decorators/param/cookies.decorator';
 import { PasswordRecoveryInputDto } from './input-dto/password-recovery.input.dto';
 import { NewPasswordInputDto } from './input-dto/new-password.input.dto';
 import { RegistrationConfirmationInputDto } from './input-dto/registration-confirmation.input.dto';
@@ -193,7 +193,7 @@ export class AuthController {
   async registrationEmailResending(
     @Body() body: RegistrationEmailResendingInputDto,
   ): Promise<void> {
-    await this.commandBus.execute(new RegistrationEmailResendingCommand(body));
+    return this.commandBus.execute(new RegistrationEmailResendingCommand(body));
   }
 
   @Get('me')

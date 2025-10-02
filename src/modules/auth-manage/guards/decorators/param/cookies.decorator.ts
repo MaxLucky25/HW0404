@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { RequestWithCookies } from '../../types/express-typed';
+import { RequestWithCookies } from '../../../../../types/express-typed';
 
 export const Cookies = createParamDecorator(
   (
