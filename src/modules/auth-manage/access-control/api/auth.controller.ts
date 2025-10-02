@@ -193,16 +193,7 @@ export class AuthController {
   async registrationEmailResending(
     @Body() body: RegistrationEmailResendingInputDto,
   ): Promise<void> {
-    console.log('registrationEmailResending called with:', body);
-    try {
-      await this.commandBus.execute(
-        new RegistrationEmailResendingCommand(body),
-      );
-      console.log('registrationEmailResending completed successfully');
-    } catch (error) {
-      console.log('registrationEmailResending error:', error);
-      throw error;
-    }
+    return this.commandBus.execute(new RegistrationEmailResendingCommand(body));
   }
 
   @Get('me')
