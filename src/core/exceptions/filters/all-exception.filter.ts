@@ -10,33 +10,22 @@ import { isErrorWithMessage } from './is-error-with-message';
 import { ThrottlerException } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 
-@Catch()
+@Catch(ThrottlerException)
 export class AllHttpExceptionsFilter implements ExceptionFilter {
   constructor(private readonly configService: ConfigService) {}
 
-  catch(exception: unknown, host: ArgumentsHost): void {
+  catch(exception: ThrottlerException, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
     // Логируем для отладки
-    console.log('AllHttpExceptionsFilter caught:', {
+    console.log('AllHttpExceptionsFilter caught ThrottlerException:', {
       exception: exception?.constructor?.name,
-      message: exception instanceof Error ? exception.message : 'Unknown',
-      isThrottler: exception instanceof ThrottlerException,
+      message: exception.message,
     });
 
-    const isThrottler = exception instanceof ThrottlerException;
-    const status = isThrottler
-      ? HttpStatus.TOO_MANY_REQUESTS
-      : HttpStatus.INTERNAL_SERVER_ERROR;
-
-    const isProd = this.configService.get<string>('NODE_ENV') === 'production';
-    const message =
-      isThrottler || !isProd
-        ? isErrorWithMessage(exception)
-          ? exception.message
-          : 'Unknown exception occurred.'
-        : 'Internal server error'; // скрытое сообщение в проде
+    const status = HttpStatus.TOO_MANY_REQUESTS;
+    const message = exception.message;
 
     const responseBody = this.buildResponseBody(message);
 
