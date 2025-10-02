@@ -124,7 +124,7 @@ export class AuthController {
   async passwordRecovery(
     @Body() body: PasswordRecoveryInputDto,
   ): Promise<void> {
-    return this.commandBus.execute(new PasswordRecoveryCommand(body));
+    await this.commandBus.execute(new PasswordRecoveryCommand(body));
   }
 
   @Post('new-password')
@@ -145,7 +145,7 @@ export class AuthController {
   })
   @ApiBody({ type: NewPasswordInputDto })
   async newPassword(@Body() body: NewPasswordInputDto): Promise<void> {
-    return this.commandBus.execute(new NewPasswordCommand(body));
+    await this.commandBus.execute(new NewPasswordCommand(body));
   }
 
   @Post('registration-confirmation')
@@ -168,7 +168,7 @@ export class AuthController {
   async registrationConfirmation(
     @Body() body: RegistrationConfirmationInputDto,
   ): Promise<void> {
-    return this.commandBus.execute(new RegistrationConfirmationCommand(body));
+    await this.commandBus.execute(new RegistrationConfirmationCommand(body));
   }
 
   @Post('registration-email-resending')
@@ -193,7 +193,7 @@ export class AuthController {
   async registrationEmailResending(
     @Body() body: RegistrationEmailResendingInputDto,
   ): Promise<void> {
-    return this.commandBus.execute(new RegistrationEmailResendingCommand(body));
+    await this.commandBus.execute(new RegistrationEmailResendingCommand(body));
   }
 
   @Get('me')
@@ -240,6 +240,6 @@ export class AuthController {
     @Cookies() cookies: Record<string, string> | undefined,
     @Res({ passthrough: true }) res: ResponseWithCookies,
   ): Promise<void> {
-    return this.commandBus.execute(new LogoutUserCommand(user, cookies, res));
+    await this.commandBus.execute(new LogoutUserCommand(user, cookies, res));
   }
 }
