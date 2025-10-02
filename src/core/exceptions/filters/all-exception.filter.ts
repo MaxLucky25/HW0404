@@ -18,6 +18,13 @@ export class AllHttpExceptionsFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
+    // Логируем для отладки
+    console.log('AllHttpExceptionsFilter caught:', {
+      exception: exception?.constructor?.name,
+      message: exception instanceof Error ? exception.message : 'Unknown',
+      isThrottler: exception instanceof ThrottlerException,
+    });
+
     const isThrottler = exception instanceof ThrottlerException;
     const status = isThrottler
       ? HttpStatus.TOO_MANY_REQUESTS
