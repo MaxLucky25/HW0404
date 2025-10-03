@@ -39,13 +39,12 @@ export class LoginUserUseCase
       'JWT_REFRESH_EXPIRES_IN',
     );
 
-    // Ищем существующую активную сессию с таким же IP и браузером для этого пользователя
+    // Ищем существующую активную сессию с таким же браузером для этого пользователя
     const existingSessions = await this.securityDeviceRepository.findByUserId({
       userId: userContext.id,
     } as FindByUserIdDto);
     const existingSession = existingSessions?.find((session) => {
       return (
-        session.ip === command.ip &&
         this.authService.isSameBrowser(session.userAgent, command.userAgent) &&
         session.isActive()
       );
