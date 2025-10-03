@@ -44,10 +44,7 @@ export class LoginUserUseCase
       userId: userContext.id,
     } as FindByUserIdDto);
     const existingSession = existingSessions?.find((session) => {
-      return (
-        this.authService.isSameBrowser(session.userAgent, command.userAgent) &&
-        session.isActive()
-      );
+      return session.userAgent === command.userAgent && session.isActive();
     });
 
     let deviceId: string;
